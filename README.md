@@ -1,4 +1,4 @@
-# Elevate Sports
+# Elevate Basketball
 
 JavaScript, Next.js App Router and Tailwind CSS. Clerk handles visitor authentication; Supabase hosts camp and booking records. The site currently displays three editable coming-soon cards, as requested. No real camp dates, prices, venues or age ranges are invented.
 
@@ -29,6 +29,12 @@ Live authentication and database integration require your real projects and have
 
 Landing-page text: `app/page.js`. Preview camp cards: `lib/camps.js`. Styles: `app/globals.css`.
 
-Hero photograph: RDNE Stock project, [Kids Playing Basketball with Their Coach](https://www.pexels.com/photo/kids-playing-basketball-with-their-coach-8336951/), used under the [Pexels license](https://www.pexels.com/license/). Stock imagery does not depict or imply endorsement of Elevate Sports.
+Hero photograph: RDNE Stock project, [Kids Playing Basketball with Their Coach](https://www.pexels.com/photo/kids-playing-basketball-with-their-coach-8336951/), used under the [Pexels license](https://www.pexels.com/license/). Stock imagery does not depict or imply endorsement of Elevate Basketball.
 
 Booking records reserve a place; there is no payment integration or email-delivery service. Add the organisation's contact details, booking terms and privacy information before opening real registration.
+
+## Event pages
+
+Edit each card and its event description in `lib/camps.js`. Each placeholder has its own `/camps/<slug>/` page. Published Supabase camps use `/camp/?id=<uuid>` to fetch current details without requiring a rebuild. Add camp dates, start/end times, venue, ages and price in Supabase when ready.
+
+In a new VS Code terminal, run `nvm use` and `npm run dev`; open the Local URL printed by Next.js. Stop the server with Ctrl+C.
