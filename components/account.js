@@ -5,7 +5,7 @@ import {
   SignedIn,
   SignedOut,
   UserButton,
-} from "@clerk/clerk-react";
+} from "@clerk/nextjs";
 import { authConfigured } from "./providers";
 export default function Account() {
   const [notice, setNotice] = useState(false);

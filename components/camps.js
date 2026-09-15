@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { useAuth, SignInButton } from "@clerk/clerk-react";
+import { useAuth } from "@clerk/nextjs";
 import {
   CalendarDays,
   MapPin,
@@ -21,14 +21,10 @@ import {
 } from "@/lib/camps";
 
 export default function Camps() {
-  return authConfigured && databaseConfigured ? (
-    <ConnectedCamps />
-  ) : (
-    <CampGrid camps={placeholderCamps} />
-  );
+  return databaseConfigured ? <PublicCamps /> : <CampGrid camps={placeholderCamps} />;
 }
 
-function CampGrid({ camps, onBook, signedIn = false }) {
+function CampGrid({ camps }) {
   const placeholders = camps.every((camp) => !camp.starts_at);
   return (
     <>
@@ -49,20 +45,6 @@ function CampGrid({ camps, onBook, signedIn = false }) {
             live &&
             camp.booking_open &&
             Date.parse(camp.starts_at) > Date.now();
-          const bookButton = (
-            <button
-              className={available ? "book-active" : ""}
-              disabled={!available}
-              onClick={signedIn ? () => onBook(camp) : undefined}
-            >
-              {available
-                ? signedIn
-                  ? "Book a place"
-                  : "Log in to book"
-                : "Booking opens soon"}
-              <ArrowUpRight size={17} />
-            </button>
-          );
           return (
             <article className="camp-card" key={camp.id}>
               <div
@@ -121,117 +103,92 @@ function CampGrid({ camps, onBook, signedIn = false }) {
   );
 }
 
-function ConnectedCamps() {
-  const { getToken, isSignedIn, isLoaded, userId } = useAuth();
-  const db = useMemo(() => createSupabaseClient(() => getToken()), [getToken]);
+// Published camps are public data. Never wait for Clerk or request a session
+// token here; Supabase's anon SELECT policy permits only published records.
+function PublicCamps() {
+  const db = useMemo(() => createSupabaseClient(), []);
   const [camps, setCamps] = useState([]);
-  const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [selected, setSelected] = useState(null);
-  const [revision, setRevision] = useState(0);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
-    if (!isLoaded) return;
+    const controller = new AbortController();
     let active = true;
+    const timeout = setTimeout(() => controller.abort(), 15000);
     setLoading(true);
     setError("");
-    setBookings([]);
     async function load() {
       try {
-        const result = await db
-          .from("camps")
-          .select("*")
+        const result = await db.from("camps").select("*")
           .eq("published", true)
           .gt("starts_at", new Date().toISOString())
-          .order("starts_at");
+          .order("starts_at")
+          .abortSignal(controller.signal);
         if (result.error) throw result.error;
-        if (active) setCamps(result.data);
-        if (isSignedIn) {
-          const own = await db
-            .from("bookings")
-            .select(
-              "id,participant_name,camp_title,starts_at,price_pence,created_at",
-            )
-            .order("created_at", { ascending: false });
-          if (own.error) throw own.error;
-          if (active) setBookings(own.data);
-        }
+        if (active) setCamps(result.data || []);
       } catch {
-        if (active)
-          setError("We couldn’t load camp information. Please try again.");
+        if (active) setError("We couldn’t load the camps. Please try again.");
       } finally {
+        clearTimeout(timeout);
         if (active) setLoading(false);
       }
     }
     load();
-    return () => {
-      active = false;
-    };
-  }, [db, isLoaded, isSignedIn, userId, revision]);
-  if (!isLoaded || loading)
-    return (
-      <p className="py-10" role="status">
-        Loading camps…
-      </p>
-    );
-  if (error)
-    return (
-      <div className="py-8" role="alert">
-        <p>{error}</p>
-        <button
-          className="button mt-4"
-          onClick={() => setRevision((r) => r + 1)}
-        >
-          Try again
-        </button>
-      </div>
-    );
-  return (
-    <>
-      <CampGrid
-        camps={camps.length ? camps : placeholderCamps}
-        signedIn={isSignedIn}
-        onBook={setSelected}
-      />
-      {isSignedIn && (
-        <section className="mt-10" aria-label="My bookings">
-          <h3 className="text-xl font-bold mb-4">My bookings</h3>
-          {bookings.length ? (
-            <ul className="grid gap-3">
-              {bookings.map((b) => (
-                <li
-                  className="rounded-md border border-[#d4dbce] p-5 flex flex-wrap justify-between gap-3"
-                  key={b.id}
-                >
-                  <div>
-                    <strong>{b.camp_title}</strong>
-                    <p className="mt-1">
-                      {b.participant_name} · {formatDate(b.starts_at)}
-                    </p>
-                  </div>
-                  <span>Place reserved · {formatPrice(b.price_pence)}</span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p>You haven’t booked a camp yet.</p>
-          )}
-        </section>
-      )}
-      {selected && isSignedIn && (
-        <BookingDialog
-          key={`${userId}:${selected.id}`}
-          camp={selected}
-          db={db}
-          onClose={() => {
-            setSelected(null);
-            setRevision((r) => r + 1);
-          }}
-        />
-      )}
-    </>
-  );
+    return () => { active = false; clearTimeout(timeout); controller.abort(); };
+  }, [db, attempt]);
+
+  return <>
+    {loading ? <p className="py-10" role="status">Loading camps…</p>
+      : error ? <div className="py-8" role="alert"><p>{error}</p>
+        <button className="button mt-4" onClick={() => setAttempt(n => n + 1)}>Try again</button></div>
+      : camps.length ? <CampGrid camps={camps} />
+      : <p className="py-10">No upcoming camps are available yet. Please check back soon.</p>}
+    {authConfigured && <MyBookings />}
+  </>;
+}
+
+// An account error affects this section only, never the public camp listing.
+function MyBookings() {
+  const { getToken, isSignedIn, isLoaded, userId } = useAuth();
+  const db = useMemo(() => createSupabaseClient(() => getToken?.() ?? null), [getToken]);
+  const [result, setResult] = useState({ userId: null, bookings: [], loading: true, error: "" });
+  const [attempt, setAttempt] = useState(0);
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn || !userId) return;
+    const controller = new AbortController();
+    let active = true;
+    const timeout = setTimeout(() => controller.abort(), 15000);
+    setResult({ userId, bookings: [], loading: true, error: "" });
+    async function load() {
+      try {
+        const { data, error } = await db.from("bookings")
+          .select("id,participant_name,camp_title,starts_at,price_pence,created_at")
+          .order("created_at", { ascending: false }).abortSignal(controller.signal);
+        if (error) throw error;
+        if (active) setResult({ userId, bookings: data || [], loading: false, error: "" });
+      } catch {
+        if (active) setResult({ userId, bookings: [], loading: false,
+          error: "We couldn’t load your bookings. You can still browse the camps above." });
+      } finally { clearTimeout(timeout); }
+    }
+    load();
+    return () => { active = false; clearTimeout(timeout); controller.abort(); };
+  }, [db, isLoaded, isSignedIn, userId, attempt]);
+
+  if (!isLoaded || !isSignedIn) return null;
+  const current = result.userId === userId;
+  return <section className="mt-10" aria-label="My bookings">
+    <h3 className="text-xl font-bold mb-4">My bookings</h3>
+    {!current || result.loading ? <p role="status">Loading your bookings…</p>
+      : result.error ? <div role="alert"><p>{result.error}</p>
+        <button className="button mt-4" onClick={() => setAttempt(n => n + 1)}>Try again</button></div>
+      : result.bookings.length ? <ul className="grid gap-3">{result.bookings.map(b =>
+        <li className="rounded-md border border-[#d4dbce] p-5 flex flex-wrap justify-between gap-3" key={b.id}>
+          <div><strong>{b.camp_title}</strong><p className="mt-1">{b.participant_name} · {formatDate(b.starts_at)}</p></div>
+          <span>Place reserved · {formatPrice(b.price_pence)}</span>
+        </li>)}</ul> : <p>You haven’t booked a camp yet.</p>}
+  </section>;
 }
 
 export function BookingDialog({ camp, db, onClose, onComplete = onClose }) {

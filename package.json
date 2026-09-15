@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev --hostname 127.0.0.1",
-    "build": "next build --webpack"
+    "build": "next build --webpack",
+    "start": "next start"
   },
   "dependencies": {
     "@clerk/clerk-react": "^5.61.9",

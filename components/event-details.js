@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { SignInButton, useAuth } from "@clerk/clerk-react";
+import { SignInButton, useAuth } from "@clerk/nextjs";
 import {
   ArrowLeft,
   CalendarDays,
@@ -132,7 +132,7 @@ export default function EventDetails({ camp }) {
 }
 function BookingAction({ camp }) {
   const { getToken, isSignedIn, isLoaded, userId } = useAuth();
-  const db = useMemo(() => createSupabaseClient(() => getToken()), [getToken]);
+  const db = useMemo(() => createSupabaseClient(() => getToken?.() ?? null), [getToken]);
   const [open, setOpen] = useState(false);
   const available =
     camp.booking_open && Date.parse(camp.starts_at) > Date.now();
