@@ -26,3 +26,11 @@ Never prefix the admin ID or Supabase secret variables with `NEXT_PUBLIC_`. Neve
 After configuration, verify that signed-out visitors and a different Clerk account cannot access `/api/admin/camps/` or any camp's bookings API. With your owner account, edit a camp, save, and check its public detail page. Confirm a known booking appears under that camp's Bookings tab.
 
 Run `node --test tests/admin.test.mjs` for the authorization and input-validation checks, and `npm run build` to validate the Next.js routes. These automated checks do not replace verifying the live Clerk/Supabase configuration.
+
+## Creating and deleting camps
+
+Run `supabase/migrations/20260916_admin_create_delete.sql` in Supabase SQL Editor, then deploy the updated application.
+
+Use **Create camp** in the admin sidebar. New camps default to hidden, bookings closed, £60, ages 8–18, capacity 25 and Venue TBC. Enter the camp name and UK start/end dates before saving. Tick the visibility and booking options when ready to publish.
+
+**Delete camp** requires confirmation and is available only for camps without bookings. The database checks again under a row lock, so a booking made during deletion cannot be silently removed. Hide camps with existing bookings instead.

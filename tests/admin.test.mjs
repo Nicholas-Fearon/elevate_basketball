@@ -13,3 +13,21 @@ test('owner same-origin JSON write succeeds',async()=>{const response=await runA
 test('camp values convert GBP and UK times',()=>{const result=validateCampUpdate(valid);assert.equal(result.price_pence,6000);assert.equal(result.starts_at,'2026-10-26T10:00:00.000Z');assert.equal(londonToISO('2027-05-31T10:00'),'2027-05-31T09:00:00.000Z');assert.equal(londonToISO('2027-03-28T15:00'),'2027-03-28T14:00:00.000Z');});
 for(const [name,changes] of [['unknown field',{user_id:owner}],['fractional capacity',{capacity:1.5}],['invalid price',{price_gbp:'-1'}],['invalid age',{max_age:7}],['reversed dates',{end_local:'2026-10-25T15:00'}],['hidden open camp',{published:false}],['invalid date',{start_local:'2026-02-30T10:00'}],['string boolean',{published:'true'}]])test(`rejects ${name}`,()=>assert.throws(()=>validateCampUpdate({...valid,...changes})));
 test('rejects ambiguous and missing clock-change times',()=>{assert.throws(()=>londonToISO('2027-03-28T01:30'));assert.throws(()=>londonToISO('2026-10-25T01:30'));});
+
+for (const method of ['POST','DELETE']) {
+  for (const [label,userId,origin,status] of [
+    ['signed out',null,'https://example.com',401],
+    ['non-admin','user_else','https://example.com',403],
+    ['cross-origin',owner,'https://other.example',403],
+    ['owner',owner,'https://example.com',200],
+  ]) {
+    test(`${method}: ${label}`, async () => {
+      let called=false;
+      const response=await runAdminRequest(new Request('https://example.com/api/admin/camps/', {
+        method,headers:{Origin:origin,'Content-Type':'application/json'},
+      }),{authenticate:async()=>({userId}),adminId:owner,operation:async()=>{called=true;return {ok:true};}});
+      assert.equal(response.status,status);
+      assert.equal(called,status===200);
+    });
+  }
+}

@@ -12,6 +12,7 @@ const date = (value) =>
     dateStyle: "medium",
     timeZone: "Europe/London",
   }).format(new Date(value));
+const newCamp = {id:'new',title:'',subtitle:'',tag:'BASKETBALL CAMP',description:'',arrival_information:'',location:'Venue TBC',min_age:8,max_age:18,capacity:25,price_pence:6000,published:false,booking_open:false};
 function draft(camp) {
   return {
     ...Object.fromEntries(
@@ -24,8 +25,8 @@ function draft(camp) {
         "location",
       ].map((key) => [key, camp[key] || ""]),
     ),
-    start_local: londonInput(camp.starts_at),
-    end_local: londonInput(camp.ends_at),
+    start_local: camp.starts_at ? londonInput(camp.starts_at) : "",
+    end_local: camp.ends_at ? londonInput(camp.ends_at) : "",
     min_age: camp.min_age,
     max_age: camp.max_age,
     capacity: camp.capacity,
@@ -89,16 +90,14 @@ function AdminWorkspace() {
         </div>
       ) : !camps ? (
         <p role="status">Loading camps…</p>
-      ) : camps.length === 0 ? (
-        <div className="admin-panel">
-          No camps have been added to Supabase yet.
-        </div>
       ) : (
         <div className="admin-grid">
           <aside className="admin-sidebar">
             <h2>
               All camps <span>{camps.length}</span>
             </h2>
+            <button type="button" onClick={() => setSelected('new')}>+ Create camp</button>
+            {camps.length === 0 && <p>No camps yet. Create your first camp.</p>}
             {camps.map((camp) => (
               <button
                 key={camp.id}
@@ -116,19 +115,26 @@ function AdminWorkspace() {
               </button>
             ))}
           </aside>
-          <CampEditor
+          {selected ? <CampEditor
             key={selected}
-            camp={camps.find((c) => c.id === selected)}
-            onSaved={(camp) =>
-              setCamps((all) => all.map((c) => (c.id === camp.id ? camp : c)))
-            }
-          />
+            camp={selected === 'new' ? newCamp : camps.find((c) => c.id === selected)}
+            onSaved={(camp) => {
+              setCamps((all) => all.some(c => c.id === camp.id) ? all.map(c => c.id === camp.id ? camp : c) : [...all,camp]);
+              setSelected(camp.id);
+            }}
+            onDeleted={(id) => {
+              const remaining = camps.filter(c => c.id !== id);
+              setCamps(remaining);
+              setSelected(remaining[0]?.id || null);
+            }}
+          /> : <div className="admin-panel">Select Create camp to add an event.</div>}
         </div>
       )}
     </main>
   );
 }
-function CampEditor({ camp, onSaved }) {
+function CampEditor({ camp, onSaved, onDeleted }) {
+  const creating = camp.id === 'new';
   const [form, setForm] = useState(() => draft(camp)),
     [tab, setTab] = useState("details"),
     [bookings, setBookings] = useState(null),
@@ -139,6 +145,7 @@ function CampEditor({ camp, onSaved }) {
     [reload, setReload] = useState(0);
   const dirty = JSON.stringify(form) !== JSON.stringify(draft(camp));
   useEffect(() => {
+    if (creating) { setBookings([]); return; }
     const controller = new AbortController();
     setBookings(null);
     setRosterError("");
@@ -150,7 +157,7 @@ function CampEditor({ camp, onSaved }) {
         if (e.name !== "AbortError") setRosterError(e.message);
       });
     return () => controller.abort();
-  }, [camp.id, reload]);
+  }, [camp.id, reload, creating]);
   useEffect(() => {
     if (!dirty) return;
     const warn = (e) => {
@@ -195,8 +202,8 @@ function CampEditor({ camp, onSaved }) {
     setError("");
     setStatus("");
     try {
-      const { camp: updated } = await request(`/api/admin/camps/${camp.id}/`, {
-        method: "PATCH",
+      const { camp: updated } = await request(creating ? "/api/admin/camps/" : `/api/admin/camps/${camp.id}/`, {
+        method: creating ? "POST" : "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
       });
@@ -209,6 +216,14 @@ function CampEditor({ camp, onSaved }) {
     } finally {
       setSaving(false);
     }
+  }
+  async function removeCamp() {
+    if (!window.confirm(`Permanently delete "${camp.title}"? This cannot be undone.`)) return;
+    setSaving(true); setError(''); setStatus('');
+    try {
+      await request(`/api/admin/camps/${camp.id}/`, {method:'DELETE',headers:{'Content-Type':'application/json'}});
+      onDeleted(camp.id);
+    } catch (e) { setError(e.message); } finally { setSaving(false); }
   }
   const field = (name, label, type = "text", props = {}) => (
     <label className={props.wide ? "admin-wide" : ""}>
@@ -227,7 +242,7 @@ function CampEditor({ camp, onSaved }) {
   return (
     <section className="admin-panel">
       <div className="admin-panel-heading">
-        <h2>{camp.title}</h2>
+        <h2>{creating ? "Create a camp" : camp.title}</h2>
         <p>
           {bookings
             ? `${bookings.length} booked · ${Math.max(0, camp.capacity - bookings.length)} places remaining`
@@ -251,6 +266,7 @@ function CampEditor({ camp, onSaved }) {
         <button
           role="tab"
           id="bookings-tab"
+          disabled={creating || saving}
           aria-selected={tab === "bookings"}
           aria-controls="bookings-panel"
           onClick={() => setTab("bookings")}
@@ -356,8 +372,8 @@ function CampEditor({ camp, onSaved }) {
               not automatically notified.
             </p>
             <div className="admin-actions admin-wide">
-              <button className="admin-primary" type="submit" disabled={!dirty}>
-                {saving ? "Saving…" : "Save changes"}
+              <button className="admin-primary" type="submit" disabled={!dirty && !creating}>
+                {saving ? "Saving…" : creating ? "Create camp" : "Save changes"}
               </button>
               <button
                 type="button"
@@ -371,6 +387,8 @@ function CampEditor({ camp, onSaved }) {
                 Discard changes
               </button>
               {dirty && <span>Unsaved changes</span>}
+              {!creating && <button type="button" disabled={!bookings || bookings.length > 0} onClick={removeCamp}>Delete camp</button>}
+              {!creating && bookings?.length > 0 && <p className="admin-note">Camps with bookings cannot be deleted. Uncheck “Show on the website” and save to hide this camp.</p>}
             </div>
           </fieldset>
           {error && (

@@ -1,4 +1,5 @@
-import { withAdmin, adminDatabase } from '@/lib/admin-server';
+import { validateCampUpdate } from '@/lib/admin-validation.mjs';
+import { withAdmin, adminDatabase, readJSON } from '@/lib/admin-server';
 export const dynamic='force-dynamic';
 export async function GET(request) {
   return withAdmin(request,async()=>{
@@ -9,5 +10,14 @@ export async function GET(request) {
       camps.push(...data); if(data.length<500)break;
     }
     return {camps};
+  });
+}
+
+export async function POST(request) {
+  return withAdmin(request, async () => {
+    const details = validateCampUpdate(await readJSON(request));
+    const {data,error} = await adminDatabase().from('camps').insert(details).select('*').single();
+    if (error) throw error;
+    return {camp:data};
   });
 }
