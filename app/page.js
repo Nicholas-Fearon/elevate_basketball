@@ -9,7 +9,7 @@ import {
   Dribbble,
 } from "lucide-react";
 import Camps from "@/components/camps";
-import { SiteHeader, SiteFooter } from "@/components/site-chrome";
+import { SiteHeader, SiteFooter } from "@/components/header-footer";
 export default function Home() {
   return (
     <>

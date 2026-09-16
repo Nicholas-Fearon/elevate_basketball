@@ -10,7 +10,7 @@ import {
   Users,
   Dribbble,
 } from "lucide-react";
-import { SiteHeader, SiteFooter } from "./site-chrome";
+import { SiteHeader, SiteFooter } from "./header-footer";
 import { BookingDialog } from "./camps";
 import { authConfigured } from "./providers";
 import { databaseConfigured, createSupabaseClient } from "@/lib/supabase";
@@ -132,7 +132,10 @@ export default function EventDetails({ camp }) {
 }
 function BookingAction({ camp }) {
   const { getToken, isSignedIn, isLoaded, userId } = useAuth();
-  const db = useMemo(() => createSupabaseClient(() => getToken?.() ?? null), [getToken]);
+  const db = useMemo(
+    () => createSupabaseClient(() => getToken?.() ?? null),
+    [getToken],
+  );
   const [open, setOpen] = useState(false);
   const available =
     camp.booking_open && Date.parse(camp.starts_at) > Date.now();

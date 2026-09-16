@@ -26,7 +26,7 @@ export function SiteFooter() {
   return (
     <footer className="footer">
       <a href="/#" className="brand">
-        <span className="brand-mark">E</span>
+        <span className="brand-mark">EB</span>
         <span>
           ELEVATE<small>BASKETBALL</small>
         </span>
