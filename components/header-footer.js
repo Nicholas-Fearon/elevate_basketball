@@ -12,6 +12,7 @@ export function SiteHeader() {
       <nav aria-label="Main navigation">
         <a href="/#approach">Our approach</a>
         <a href="/#camps">Basketball camps</a>
+        <a href="/schools/">For schools</a>
       </nav>
       <div className="header-actions">
         <Account />
@@ -31,7 +32,7 @@ export function SiteFooter() {
           ELEVATE<small>BASKETBALL</small>
         </span>
       </a>
-      <p>Developing physical literacy through basketball.</p>
+      <p>Developing physical literacy through basketball.<br /><a href="/schools/">Curriculum for schools</a></p>
       <span>© {new Date().getFullYear()} Elevate Basketball</span>
     </footer>
   );

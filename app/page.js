@@ -7,6 +7,7 @@ import {
   Users,
   CircleCheck,
   Dribbble,
+  Lightbulb,
 } from "lucide-react";
 import Camps from "@/components/camps";
 import { SiteHeader, SiteFooter } from "@/components/header-footer";
@@ -34,6 +35,7 @@ export default function Home() {
             <a href="#camps" className="button">
               Explore our camps <ArrowUpRight size={20} />
             </a>
+            <a className="school-hero-link" href="/schools/">For schools: curriculum and school sessions <ArrowRight size={17} /></a>
             <div className="hero-note">
               <span className="mini-ball">
                 <Dribbble size={21} />
@@ -90,21 +92,20 @@ export default function Home() {
             </h2>
             <div>
               <p className="mission">
-                We believe physical literacy is about more than learning to move
-                well, it's about building a positive relationship with movement
-                that lasts a lifetime. At Elevate, we develop that relationship
-                through basketball and fun, engaging games, so every young
-                person finds their own reason to stay active.
+                At Elevate, physical literacy means helping young people build a
+                positive, lasting relationship with movement — through sport and
+                games they actually enjoy.
               </p>
               <p className="secondary-copy">
-                Running, stopping, balancing, jumping, throwing and catching:
-                basketball gives young people opportunities to explore how they
-                move. Games help them practise making decisions, working
-                together and finding the confidence to try again.
+                That relationship includes the skills to move, the confidence to
+                participate, the motivation to return, and the understanding to
+                make choices. Basketball gives us opportunities to bring these
+                together: moving into space, choosing a pass, supporting a teammate
+                and discovering what makes a game enjoyable.
               </p>
             </div>
           </div>
-          <div className="principles">
+          <div className="principles literacy-principles">
             <article>
               <span className="principle-icon peach">
                 <Sparkles size={24} />
@@ -135,7 +136,32 @@ export default function Home() {
                 relationship with being active.
               </p>
             </article>
+            <article>
+              <span className="principle-icon green"><Lightbulb size={24} /></span>
+              <h3>Knowledge and understanding</h3>
+              <p>Notice what works, explain a choice and explore how movement feels.
+                Learning includes thinking about the game as well as playing it.</p>
+            </article>
           </div>
+          <div className="literacy-example">
+            <div><p className="section-kicker">WHAT THAT CAN LOOK LIKE</p><h3>One passing game.<br />Many ways to learn.</h3></div>
+            <div><p>A small-sided passing game can invite pupils to move into space,
+              control a catch and decide when to pass. Changing the space, ball or
+              challenge can offer different ways to take part.</p>
+              <p>Reflection makes the learning visible: “What helped you receive the
+              ball?”, “When did you feel confident?” and “What would you try next?”</p>
+              <p className="secondary-copy">This is an illustration of our approach.
+              Physical literacy develops over time and across many experiences;
+              a basketball session is one opportunity to support that journey.</p></div>
+          </div>
+          <p className="literacy-source">Explore the wider idea in <a href="https://www.sportengland.org/news-and-inspiration/physical-literacy-consensus-statement-england-published">Sport England’s physical literacy consensus statement</a>.</p>
+        </section>
+        <section id="schools" className="school-intro section-wrap">
+          <p className="section-kicker">FOR SCHOOLS / CURRICULUM &amp; DELIVERY</p>
+          <div className="approach-grid"><div><h2>Bring purpose<br />to every <span className="orange-text">game.</span></h2></div>
+            <div><p className="mission">For KS1 and KS2: a downloadable curriculum in development, and basketball sessions delivered in your school.</p><p className="secondary-copy">Explore two ways to bring physical literacy through basketball to your pupils: a curriculum for your school to use, or Elevate-led sessions during curriculum time, breakfast club or after-school club.</p>
+              <a className="button school-link" href="/schools/">Explore our school offer <ArrowUpRight size={20} /></a>
+            </div></div>
         </section>
         <section id="camps" className="camps-section section-wrap">
           <div className="section-kicker">02 / GET ON THE COURT</div>
