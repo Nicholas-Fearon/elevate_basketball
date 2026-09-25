@@ -186,7 +186,7 @@ function MyBookings() {
       : result.bookings.length ? <ul className="grid gap-3">{result.bookings.map(b =>
         <li className="rounded-md border border-[#d4dbce] p-5 flex flex-wrap justify-between gap-3" key={b.id}>
           <div><strong>{b.camp_title}</strong><p className="mt-1">{b.participant_name} · {formatDate(b.starts_at)}</p></div>
-          <span>Place reserved · {formatPrice(b.price_pence)}</span>
+          <span>Place reserved · {formatPrice(b.price_pence)} · Pay in person on the day of camp</span>
         </li>)}</ul> : <p>You haven’t booked a camp yet.</p>}
   </section>;
 }
@@ -225,6 +225,9 @@ export function BookingDialog({ camp, db, onClose, onComplete = onClose }) {
         p_guardian_consent: fields.get("consent") === "on",
       });
       if (failure) throw failure;
+      if (!data?.id || typeof data.participant_name !== "string" || !Number.isInteger(data.price_pence)) {
+        throw new Error("INVALID_CONFIRMATION");
+      }
       setConfirmation(data);
     } catch (failure) {
       const messages = {
@@ -266,7 +269,7 @@ export function BookingDialog({ camp, db, onClose, onComplete = onClose }) {
       {confirmation ? (
         <div role="status">
           <CheckCircle size={40} className="mb-5" />
-          <h2 id="booking-title">You’re on the team.</h2>
+          <h2 id="booking-title">Your camp place is confirmed.</h2>
           <p className="mt-5">
             A place is reserved for {confirmation.participant_name} at{" "}
             {camp.title}.
@@ -276,8 +279,8 @@ export function BookingDialog({ camp, db, onClose, onComplete = onClose }) {
           </p>
           <p className="mt-3 text-sm">Booking reference: {confirmation.id}</p>
           <p className="mt-3">
-            Camp price: {formatPrice(confirmation.price_pence)}. No payment has
-            been taken.
+            Please pay {formatPrice(confirmation.price_pence)} in person on the
+            day of camp. No payment is taken online.
           </p>
           <button className="button mt-6" onClick={onComplete}>
             View my bookings
@@ -345,7 +348,9 @@ export function BookingDialog({ camp, db, onClose, onComplete = onClose }) {
               </p>
             )}
             <p className="text-sm mb-4">
-              This reserves a place. No payment is taken online.
+              Your place will be confirmed on screen once your booking is saved.
+              Pay {formatPrice(camp.price_pence)} in person on the day of camp.
+              No payment is taken online.
             </p>
             <button className="button w-full" disabled={busy}>
               {busy ? "Reserving your place…" : "Reserve a place"}

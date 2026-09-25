@@ -451,7 +451,7 @@ function CampEditor({ camp, onSaved, onDeleted }) {
             </div>
           )}
           <p className="admin-note">
-            Booked price is the agreed camp price; it does not confirm payment.
+            Payment is due in person on the day of camp. Booked price is the agreed amount; a reservation does not confirm payment.
           </p>
         </div>
       )}

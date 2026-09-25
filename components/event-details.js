@@ -110,7 +110,7 @@ export default function EventDetails({ camp }) {
             </p>
             <p>
               {live
-                ? "Per participant. No payment is taken online."
+                ? "Per participant for the whole camp. Reserve online and pay in person on the day of camp."
                 : "Dates, ages, location and pricing will be added when this event is ready."}
             </p>
             {live && authConfigured && databaseConfigured ? (
