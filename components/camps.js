@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { bookingErrorMessage } from "@/lib/booking-errors.mjs";
 import { useAuth } from "@clerk/nextjs";
 import {
   CalendarDays,
@@ -14,35 +15,24 @@ import {
 import { authConfigured } from "./providers";
 import { createSupabaseClient, databaseConfigured } from "@/lib/supabase";
 import {
-  placeholderCamps,
   formatDate,
   formatPrice,
   campHref,
 } from "@/lib/camps";
 
 export default function Camps() {
-  return databaseConfigured ? <PublicCamps /> : <CampGrid camps={placeholderCamps} />;
+  return databaseConfigured ? <PublicCamps /> : <p className="py-10" role="status">Camps are currently unavailable. Please check back soon.</p>;
 }
 
 function CampGrid({ camps }) {
-  const placeholders = camps.every((camp) => !camp.starts_at);
   return (
     <>
-      {placeholders && (
-        <div className="preview-note">
-          <span className="status-dot" />
-          Our camp line-up is taking shape. Dates and booking details coming
-          soon.
-        </div>
-      )}
       <div
         className="camp-grid"
-        style={{ marginTop: placeholders ? undefined : 30 }}
+        style={{ marginTop: 30 }}
       >
         {camps.map((camp, i) => {
-          const live = Boolean(camp.starts_at);
           const available =
-            live &&
             camp.booking_open &&
             Date.parse(camp.starts_at) > Date.now();
           return (
@@ -69,9 +59,7 @@ function CampGrid({ camps }) {
                 <ul>
                   <li>
                     <CalendarDays />
-                    {live
-                      ? formatDate(camp.starts_at)
-                      : "Dates to be announced"}
+                    {formatDate(camp.starts_at)}
                   </li>
                   <li>
                     <MapPin />
@@ -79,16 +67,12 @@ function CampGrid({ camps }) {
                   </li>
                   <li>
                     <Users />
-                    {live
-                      ? `Ages ${camp.min_age}–${camp.max_age}`
-                      : "Age groups to be confirmed"}
+                    {`Ages ${camp.min_age}–${camp.max_age}`}
                   </li>
                 </ul>
                 <div className="camp-bottom">
                   <span>
-                    {live
-                      ? `${formatPrice(camp.price_pence)} per participant`
-                      : "Details coming soon"}
+                    {`${formatPrice(camp.price_pence)} per participant`}
                   </span>
                   <Link className="camp-details-button" href={campHref(camp)}>
                     View event details <ArrowUpRight size={17} />
@@ -216,7 +200,7 @@ export function BookingDialog({ camp, db, onClose, onComplete = onClose }) {
     setBusy(true);
     setError("");
     try {
-      const { data, error: failure } = await db.rpc("book_camp", {
+      const { data, error: failure, status } = await db.rpc("book_camp", {
         p_camp_id: camp.id,
         p_participant_name: fields.get("participant").trim(),
         p_age: Number(fields.get("age")),
@@ -224,24 +208,13 @@ export function BookingDialog({ camp, db, onClose, onComplete = onClose }) {
         p_contact_email: fields.get("email").trim(),
         p_guardian_consent: fields.get("consent") === "on",
       });
-      if (failure) throw failure;
+      if (failure) throw { code: failure.code, message: failure.message, status };
       if (!data?.id || typeof data.participant_name !== "string" || !Number.isInteger(data.price_pence)) {
         throw new Error("INVALID_CONFIRMATION");
       }
       setConfirmation(data);
     } catch (failure) {
-      const messages = {
-        CAMP_FULL: "This camp has just filled up. Please choose another camp.",
-        CAMP_CLOSED: "Booking is now closed for this camp.",
-        AGE_NOT_ELIGIBLE:
-          "Please check the participant’s age against this camp’s age range.",
-        INVALID_DETAILS: "Please check your details and guardian confirmation.",
-        AUTH_REQUIRED: "Please log in again before booking.",
-      };
-      setError(
-        messages[failure.message] ||
-          "We couldn’t confirm your booking. Please retry; if it was saved, the same booking will be returned.",
-      );
+      setError(bookingErrorMessage(failure));
     } finally {
       busyRef.current = false;
       setBusy(false);

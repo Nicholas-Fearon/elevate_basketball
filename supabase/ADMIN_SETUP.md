@@ -34,3 +34,13 @@ Run `supabase/migrations/20260916_admin_create_delete.sql` in Supabase SQL Edito
 Use **Create camp** in the admin sidebar. New camps default to hidden, bookings closed, £60, ages 8–18, capacity 25 and Venue TBC. Enter the camp name and UK start/end dates before saving. Tick the visibility and booking options when ready to publish.
 
 **Delete camp** requires confirmation and is available only for camps without bookings. The database checks again under a row lock, so a booking made during deletion cannot be silently removed. Hide camps with existing bookings instead.
+
+## Private coaching notebook
+
+Run `supabase/migrations/20261123_coaching_notebook.sql` once in Supabase SQL Editor, then deploy the code to Vercel. No additional environment variables are needed. Open `/admin/` and choose **Coaching notebook**.
+
+Create journal entries or session plans, choose a date, and use **Save entry**. The 45-minute session template includes ball familiarisation, dribbling, a lesson focus, related games and reflection. Search and filter saved entries; deletion requires confirmation. Notes are plain text and saved in Supabase, not browser storage. Unsaved edits trigger a warning when following a link or closing the page; save before navigating with browser history or signing out.
+
+The page and every notebook API request use the existing `ADMIN_CLERK_USER_ID` check. The table has RLS enabled with no browser policies and no anon/authenticated grants. The service-role server connection can access it only after the API owner check. Supabase project administrators can still access the data; this is not end-to-end encryption. Concurrent edits are rejected rather than silently overwriting another saved version.
+
+Verify that signed-out visitors and a non-owner account cannot access the notebook API. As the owner, create a journal and a plan, reload to check persistence, edit and delete a test entry. These live checks require the migration and your Clerk/Supabase configuration.
