@@ -35,12 +35,12 @@ Use **Create camp** in the admin sidebar. New camps default to hidden, bookings 
 
 **Delete camp** requires confirmation and is available only for camps without bookings. The database checks again under a row lock, so a booking made during deletion cannot be silently removed. Hide camps with existing bookings instead.
 
-## Private coaching notebook
+## Private coaching notebook (browser storage)
 
-Run `supabase/migrations/20261123_coaching_notebook.sql` once in Supabase SQL Editor, then deploy the code to Vercel. No additional environment variables are needed. Open `/admin/` and choose **Coaching notebook**.
+Open `/admin/notebook/` using your administrator account. No Supabase migration or additional environment variables are required for the notebook. Camp booking data continues to use Supabase.
 
-Create journal entries or session plans, choose a date, and use **Save entry**. The 45-minute session template includes ball familiarisation, dribbling, a lesson focus, related games and reflection. Search and filter saved entries; deletion requires confirmation. Notes are plain text and saved in Supabase, not browser storage. Unsaved edits trigger a warning when following a link or closing the page; save before navigating with browser history or signing out.
+The notebook uses IndexedDB, separated by Clerk user ID and website origin. Entries stay in this browser profile on this device; a different browser, device, domain, or development URL has separate storage. They are not uploaded to the server. Clearing browser data or using temporary/private browsing can remove them. The page still requires the configured administrator account and an online Clerk sign-in; this is not an offline app or encrypted storage.
 
-The page and every notebook API request use the existing `ADMIN_CLERK_USER_ID` check. The table has RLS enabled with no browser policies and no anon/authenticated grants. The service-role server connection can access it only after the API owner check. Supabase project administrators can still access the data; this is not end-to-end encryption. Concurrent edits are rejected rather than silently overwriting another saved version.
+Use **Save entry** to persist edits. **Export backup** downloads saved entries as a plaintext JSON file (up to 1,000 entries / 10 MB); unsaved edits are excluded. Keep backups somewhere private. **Import backup** validates the whole file and adds entries as new copies in one transaction, preserving existing entries. Repeated imports create duplicates. Save or discard current edits before importing. Concurrent edits in another tab are rejected until you reload.
 
-Verify that signed-out visitors and a non-owner account cannot access the notebook API. As the owner, create a journal and a plan, reload to check persistence, edit and delete a test entry. These live checks require the migration and your Clerk/Supabase configuration.
+The previous notebook migration and API routes have been removed. Any table already created in Supabase is left untouched; existing server notes are not automatically migrated into browser storage.

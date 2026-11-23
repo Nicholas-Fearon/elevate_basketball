@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '@clerk/nextjs';
+import {listEntries, saveEntry, deleteEntry, exportBackup, importBackup, MAX_BACKUP_BYTES} from '@/lib/local-notebook.mjs';
 
 const sessionTemplate = `Group / year group:
 Venue and equipment:
@@ -41,19 +42,14 @@ My next step:
 const label = kind => kind === 'session' ? 'Session plan' : 'Journal';
 const today = () => new Intl.DateTimeFormat('en-CA', {timeZone: 'Europe/London', year: 'numeric', month: '2-digit', day: '2-digit'}).format(new Date());
 const fields = entry => ({kind: entry.kind, title: entry.title, entry_date: entry.entry_date, content: entry.content});
-async function request(url, options = {}) {
-  const response = await fetch(url, {cache: 'no-store', credentials: 'same-origin', ...options});
-  const body = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(body.error || 'Unable to load your notebook. Please try again.');
-  return body;
-}
 export default function CoachingNotebook() {
   const {isLoaded, isSignedIn, userId} = useAuth();
   if (!isLoaded) return <main className="admin-access" role="status">Loading your account…</main>;
   if (!isSignedIn) return <main className="admin-access">Please sign in again to open your notebook.</main>;
-  return <Notebook key={userId} />;
+  return <Notebook key={userId} userId={userId} />;
 }
-function Notebook() {
+function Notebook({userId}) {
+  const importInput = useRef(null);
   const [entries, setEntries] = useState(null);
   const [selected, setSelected] = useState(null);
   const [draft, setDraft] = useState(null);
@@ -67,13 +63,13 @@ function Notebook() {
   const busyRef = useRef(false);
   const dirty = draft !== null && JSON.stringify(draft) !== baseline;
   useEffect(() => {
-    const controller = new AbortController();
+    let active = true;
     setError('');
-    request('/api/admin/notebook/', {signal: controller.signal})
-      .then(({entries}) => setEntries(entries))
-      .catch(e => {if (e.name !== 'AbortError') setError(e.message);});
-    return () => controller.abort();
-  }, [reload]);
+    listEntries(userId)
+      .then(entries => {if (active) setEntries(entries);})
+      .catch(e => {if (active) setError(e.message);});
+    return () => {active = false;};
+  }, [reload, userId]);
   useEffect(() => {
     if (!dirty && !busy) return;
     const leave = e => {e.preventDefault(); e.returnValue = '';};
@@ -106,31 +102,58 @@ function Notebook() {
     if (busyRef.current) return;
     busyRef.current = true; setBusy(true); setError(''); setNotice('');
     try {
-      const {entry} = await request(selected ? `/api/admin/notebook/${selected.id}/` : '/api/admin/notebook/', {
-        method: selected ? 'PATCH' : 'POST', headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(selected ? {...draft, version: selected.version} : draft),
-      });
+      const entry = await saveEntry(userId, draft, selected);
       setEntries(current => [entry, ...(current || []).filter(item => item.id !== entry.id)]);
-      setSelected(entry); setDraft(fields(entry)); setBaseline(JSON.stringify(fields(entry))); setNotice('Saved to your private notebook.');
-    } catch (e) {setError(e.message + (!selected ? ' If the connection dropped, copy your notes and reload before retrying to check whether the entry was saved.' : ''));}
+      setSelected(entry); setDraft(fields(entry)); setBaseline(JSON.stringify(fields(entry))); setNotice('Saved in this browser on this device.');
+    } catch (e) {setError(e.message);}
     finally {busyRef.current = false; setBusy(false);}
   }
   async function remove() {
     if (busyRef.current || !selected || !window.confirm(`Permanently delete “${selected.title}”? This also discards any unsaved changes.`)) return;
     busyRef.current = true; setBusy(true); setError(''); setNotice('');
     try {
-      await request(`/api/admin/notebook/${selected.id}/`, {method: 'DELETE', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({version: selected.version})});
+      await deleteEntry(userId, selected);
       setEntries(current => current.filter(item => item.id !== selected.id)); setSelected(null); setDraft(null); setBaseline(''); setNotice('Entry deleted.');
     } catch (e) {setError(e.message);}
     finally {busyRef.current = false; setBusy(false);}
   }
+  async function downloadBackup() {
+    if (busyRef.current) return;
+    busyRef.current = true; setBusy(true); setError(''); setNotice('');
+    try {
+      const text = await exportBackup(userId);
+      const url = URL.createObjectURL(new Blob([text], {type: 'application/json'}));
+      const link = document.createElement('a'); link.href = url; link.download = `elevate-notebook-${today()}.json`;
+      // A download does not navigate away from unsaved edits.
+      link.addEventListener('click', event => event.stopPropagation());
+      link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setNotice('Backup download started. Only saved entries are included. Keep this file somewhere private.');
+    } catch (e) {setError(e.message);}
+    finally {busyRef.current = false; setBusy(false);}
+  }
+  async function restoreBackup(event) {
+    const file = event.target.files?.[0]; event.target.value = '';
+    if (!file || !canSwitch()) return;
+    if (file.size > MAX_BACKUP_BYTES) {setError('Choose a backup smaller than 10 MB.'); return;}
+    if (!window.confirm('Import this backup as new entries? Existing entries will be kept. Importing the same file again creates additional copies.')) return;
+    busyRef.current = true; setBusy(true); setError(''); setNotice('');
+    let count;
+    try {
+      count = await importBackup(userId, await file.text());
+      setDraft(null); setSelected(null); setBaseline('');
+      setEntries(await listEntries(userId)); setNotice(`Imported ${count} entries into this browser.`);
+    } catch (e) {setError(count !== undefined ? 'Import was saved, but the list could not refresh. Reload the notebook before importing again.' : e.message);}
+    finally {busyRef.current = false; setBusy(false);}
+  }
   const visible = (entries || []).filter(entry => (filter === 'all' || entry.kind === filter) && `${entry.title} ${entry.content}`.toLowerCase().includes(query.toLowerCase())).sort((a, b) => b.entry_date.localeCompare(a.entry_date) || b.created_at.localeCompare(a.created_at));
   return <main className="admin-main">
-    <div className="admin-heading"><p className="section-kicker">ELEVATE BASKETBALL / PRIVATE NOTEBOOK</p><h1>Space to reflect. Room to plan.</h1><p>Your coaching journal and session plans, available only through your administrator account.</p></div>
+    <div className="admin-heading"><p className="section-kicker">ELEVATE BASKETBALL / PRIVATE NOTEBOOK</p><h1>Space to reflect. Room to plan.</h1><p>Your coaching journal and session plans, saved in this browser on this device.</p></div>
     <div className="admin-actions notebook-toolbar"><button className="admin-primary" disabled={busy || !entries} onClick={() => create('journal')}>New journal entry</button><button disabled={busy || !entries} onClick={() => create('session')}>New session plan</button><button disabled={busy} onClick={refresh}>Reload notebook</button></div>
+    <p className="admin-note">Browser-only storage: entries do not sync to other devices, browsers or website addresses. Clearing browser data can delete them. Export regular backups. Admin login protects this page; the stored notes and downloaded backups are not encrypted.</p>
+    <div className="admin-actions notebook-toolbar"><button disabled={busy || !entries} onClick={downloadBackup}>Export backup</button><button disabled={busy || !entries} onClick={() => importInput.current.click()}>Import backup</button><input ref={importInput} type="file" accept=".json,application/json" hidden onChange={restoreBackup} /></div>
     {error && <div className="admin-alert" role="alert">{error}</div>}
     {notice && <p className="admin-success" role="status">{notice}</p>}
-    {!entries ? <p role="status">{error ? 'Your notebook could not be loaded. Check the notebook migration has been applied, then reload.' : 'Loading your notebook…'}</p> : <div className="admin-grid">
+    {!entries ? <p role="status">{error ? 'Your notebook could not be loaded. Check that browser storage is enabled, then reload.' : 'Loading your notebook…'}</p> : <div className="admin-grid">
       <aside className="admin-sidebar notebook-sidebar" aria-label="Notebook entries">
         <h2>Your entries ({entries.length})</h2>
         <label>Search notes<input type="search" value={query} onChange={e => setQuery(e.target.value)} placeholder="Title or words in your notes" /></label>
